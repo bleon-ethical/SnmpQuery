@@ -32,7 +32,7 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 One of the most valuable contributions is testing SnmpQuery on different network hardware!
 
 **Tested and working:**
-- ✅ Cisco ISR 4000 series routers
+- ✅ Cisco ISR 4000, 1900, 2800 series routers
 - ✅ Various L2 managed switches with SNMP support
 
 **Need testing:**

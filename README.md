@@ -2,6 +2,7 @@
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+![Platform](https://img.shields.io/badge/platform-linux-lightgrey.svg)
 
 **SnmpQuery** is an open-source network monitoring and discovery solution designed for small to medium-sized businesses that need professional-grade network visibility without enterprise-level costs. Built with Python, it leverages SNMP, NetFlow, and ARP table analysis to provide real-time insights into network topology, device connectivity, and traffic patterns.
 
@@ -9,12 +10,12 @@
 
 Many small and medium businesses struggle with limited budgets for network monitoring tools. SnmpQuery bridges this gap by providing:
 
-- 🔍 **Real-time device discovery** through SNMP and ARP table analysis
+- 🔍 **Real-time device monitoring** through SNMP and ARP table analysis
 - 🌐 **Network topology mapping** with automatic switch hierarchy detection
 - 📊 **Optional NetFlow traffic analysis** for bandwidth monitoring
 - 🖥️ **Web-based dashboard** for easy management and queries
 - 💰 **Zero licensing costs** - completely free and open source
-- 🛠️ **Built for reality** - tested in production with Cisco ISR routers and L2 managed switches
+- 🛠️ **Built for reality** - tested in production with Cisco ISR routers and budget L2 managed switches
 
 Perfect for IT staff at small businesses, MSPs managing multiple sites, or anyone who needs visibility into their network without breaking the budget.
 
