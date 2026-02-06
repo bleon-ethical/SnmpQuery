@@ -1,0 +1,92 @@
+# SnmpQuery Configuration File
+# 
+# Copy this file to snmpQuery.ini and customize for your network
+# 
+# IMPORTANT: This file contains sensitive information (SNMP community strings,
+# network topology). Keep it secure and never commit it to version control.
+
+# ============================================================================
+# NETWORK CONFIGURATION
+# ============================================================================
+
+# Your monitored network range
+# NETWORK should be the network address
+# MASKBITS is the CIDR prefix length (e.g., 24 for /24, 255.255.255.0)
+NETWORK=192.168.1.0
+MASKBITS=24
+
+# Default gateway (router) IP address
+# This is used to identify the gateway port on switches, ARP table, etc.
+gateway=192.168.1.1
+
+# SNMP community string (read-only)
+# SECURITY: Use a complex, unique string and restrict SNMP access by source IP
+community=public
+
+# ============================================================================
+# SWITCHES
+# ============================================================================
+# List all switches you want to monitor
+# Format: IP_ADDRESS=Description
+#
+# Requirements:
+# - Each switch must have SNMP v2c enabled
+# - SNMP community string must match the one above
+# - Switch must be reachable from the monitoring server
+
+START_SWITCHES
+# Example switches:
+# 192.168.1.10=Core Switch - Main Distribution
+# 192.168.1.11=Floor 1 - Access Switch
+# 192.168.1.12=Floor 2 - Access Switch
+# 192.168.1.13=Server Room - Access Switch
+END_SWITCHES
+
+# ============================================================================
+# ACCESS POINTS (Optional)
+# ============================================================================
+# List wireless access points for identification
+# Format: AP=MAC_ADDRESS=Friendly_Name
+# MAC address format: Use colons as separators (aa:bb:cc:dd:ee:ff)
+#
+# This helps the system identify APs in the network and display
+# their friendly names instead of just MAC addresses
+
+# Example access points:
+# AP=aa:bb:cc:dd:ee:ff=Main Office - AP01
+# AP=11:22:33:44:55:66=Conference Room - AP02
+# AP=aa:11:bb:22:cc:33=Warehouse - AP03
+
+# ============================================================================
+# ADVANCED SETTINGS (Optional)
+# ============================================================================
+
+# These settings are typically not needed but can be customized:
+
+# TTL - Time To Live (in hours) before the service stops
+# Set to 0 for continuous operation (recommended for production)
+# TTL=0
+
+# DEBUG - Enable verbose logging
+# DEBUG=0
+
+# ============================================================================
+# NOTES
+# ============================================================================
+#
+# After editing this file:
+# 1. Verify syntax - no spaces around '=' signs
+# 2. Ensure all IP addresses are correct
+# 3. Test SNMP connectivity: snmpwalk -v 2c -c YOUR_COMMUNITY SWITCH_IP
+# 4. Restart snmpPyServer.py to apply changes
+#
+# File permissions: Consider setting restrictive permissions:
+#   chmod 600 snmpQuery.ini
+#   chown root:root snmpQuery.ini
+#
+# For production use:
+# - Use a strong, unique SNMP community string
+# - Configure SNMP ACLs on devices to restrict access
+# - Consider using SNMPv3 (requires code modifications, not currently supported)
+# - Keep this file in a secure location
+# - Never commit this file to version control (it's in .gitignore)

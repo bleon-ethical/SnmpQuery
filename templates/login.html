@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - SnmpQuery WEB</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .terminal-box {
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center">
+    <div class="terminal-box p-8 max-w-md w-full">
+        <h1 class="text-2xl font-bold mb-6 text-center" style="color: #a288ff;">
+            🔐 SnmpQuery Web Interface
+        </h1>
+        
+        {% if error %}
+        <div class="bg-red-600 text-white p-3 rounded mb-4">
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="mb-4">
+                <label for="username" class="block mb-2 text-sm">Username</label>
+                <input 
+                    type="text" 
+                    id="username" 
+                    name="username" 
+                    required
+                    class="w-full p-2 rounded bg-gray-800 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                    autofocus
+                >
+            </div>
+            
+            <div class="mb-6">
+                <label for="password" class="block mb-2 text-sm">Password</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    required
+                    class="w-full p-2 rounded bg-gray-800 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                >
+            </div>
+            
+            <button 
+                type="submit"
+                class="w-full py-2 rounded font-semibold transition"
+                style="background-color: #a288ff; color: #000;"
+                onmouseover="this.style.backgroundColor='#b298ff'"
+                onmouseout="this.style.backgroundColor='#a288ff'"
+            >
+                Login
+            </button>
+        </form>
+        
+        <p class="mt-6 text-center text-sm text-gray-500">
+            Internal IT Tool - Authorized Personnel Only
+        </p>
+    </div>
+</body>
+</html>

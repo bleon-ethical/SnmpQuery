@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - SnmpQuery Web Interface{% endblock %}
+
+{% block content %}
+<!-- Query Input Section -->
+<div class="terminal-box p-6 mb-6">
+    <h2 class="text-xl font-bold mb-4" style="color: #898989;">Query Network</h2>
+    
+    <form action="{{ url_for('query') }}" method="POST" id="queryForm">
+        <!-- Main query input -->
+        <div class="mb-4">
+            <input 
+                type="text" 
+                name="query" 
+                id="queryInput"
+                placeholder="Enter IP, MAC, or command (e.g., 'status', 'map 192.168.0.2', 'switchport 192.168.0.2 24')"
+                class="w-full p-3 rounded bg-gray-800 border border-gray-600 focus:border-purple-500 focus:outline-none text-lg"
+                autocomplete="off"
+                autofocus
+            >
+        </div>
+        
+        <!-- Options row -->
+        <div class="flex gap-4 items-center flex-wrap">
+            <!-- Auto-refresh toggle -->
+            <label class="flex items-center gap-2">
+                <input type="checkbox" name="auto_refresh" id="autoRefresh" class="w-4 h-4">
+                <span class="text-sm">Auto-refresh</span>
+            </label>
+            
+            <!-- Refresh interval -->
+            <select name="refresh_interval" id="refreshInterval" class="p-2 rounded bg-gray-800 border border-gray-600 text-sm">
+                <option value="5">Every 5 sec</option>
+                <option value="10">Every 10 sec</option>
+                <option value="30">Every 30 sec</option>
+                <option value="60">Every 1 min</option>
+            </select>
+
+            <!-- Submit button -->
+            <button 
+                type="submit"
+                class="px-6 py-2 rounded font-semibold transition"
+                style="background-color: #a288ff; color: #000;"
+                onmouseover="this.style.backgroundColor='#b298ff'"
+                onmouseout="this.style.backgroundColor='#a288ff'"
+            >
+                Execute Query
+            </button>
+        </div>
+    </form>
+
+
+
+
+
+
+
+
+    <!-- Query History -->
+    {% if history %}
+    <div class="mt-4">
+        <p class="text-sm text-gray-400 mb-2">Recent queries:</p>
+        <div class="flex flex-wrap gap-2">
+            {% for h in history[:10] %}
+            <button 
+                onclick="document.getElementById('queryInput').value='{{ h }}'; document.getElementById('queryForm').submit();"
+                class="px-3 py-1 text-sm rounded border border-gray-600 hover:bg-gray-700 transition"
+            >
+                {{ h }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Quick Actions -->
+<div class="terminal-box p-6 mb-6">
+    <h3 class="text-lg font-semibold mb-3 swname" style="color: #898989;">Quick Actions</h3>
+    <div class="flex gap-3 flex-wrap">
+        <button onclick="quickQuery('')" class="px-4 py-2 bg-blue-700 hover:bg-blue-600 rounded text-sm">
+            📊 All Switches Status
+        </button>
+        <!-- Add more quick action buttons as needed -->
+    </div>
+</div>
+
+<!-- NetFlow Global Statistics -->
+{% if netflow_stats %}
+<div class="terminal-box p-6 mb-6">
+    <h3 class="text-lg font-semibold mb-4" style="color: #898989;">Network Traffic (Last
+    {% if netflow_stats.time_window < 1 %}
+        {{ (netflow_stats.time_window * 60) | int }} sec
+    {% else %}
+        {{ netflow_stats.time_window | int }} min
+    {% endif %}
+    )
+
+    <form action="{{ url_for('dashboard') }}" method="POST">
+    <!-- NetFlow interval -->
+        <select name="netflow_window_dash" class="p-2 rounded bg-gray-800 border border-gray-600 text-sm">
+            <option value="0.33">20 seconds</option>
+            <option value="1">1 minute</option>
+            <option value="5" selected>5 minutes</option>
+            <option value="15">15 minutes</option>
+        </select>
+        <button type="submit" class="px-6 py-2 rounded font-semibold" style="background-color: #a288ff; color: #000;">
+            Apply
+        </button>
+   </form>
+
+    </h3>
+
+
+
+
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Internet Upload -->
+        <div class="bg-gray-800 p-4 rounded">
+            <h4 class="font-semibold mb-2 text-green-400">🌐 Internet Upload</h4>
+            {% if netflow_stats.publicUS and netflow_stats.publicUS.flow_count > 0 %}
+                <div class="text-sm space-y-1">
+                    <p><span class="text-gray-400">Total:</span>
+                       <span class="hostip">{{ "%.2f"|format(netflow_stats.publicUS.formatted_bytes[0]) }} {{ netflow_stats.publicUS.formatted_bytes[1] }}</span>
+                    </p>
+                    <p><span class="text-gray-400">Avg Speed:</span>
+                       <span class="hostip">{{ "%.2f"|format(netflow_stats.publicUS.avg_speed[0]) }} {{ netflow_stats.publicUS.avg_speed[1] }}</span>
+                    </p>
+                    <p><span class="text-gray-400">Flows:</span> {{ netflow_stats.publicUS.flow_count }}</p>
+
+
+
+
+                    <!-- NetFlow TOP 5 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+                    {% if netflow_stats.publicUS.top5 %}
+                    <div class="mt-2">
+                        <p class="text-gray-400 text-xs mb-1">Top 5:</p>
+                        <div class="text-xs space-y-0.5">
+                            {% for ip, port, proto, bytes, formatted, service in netflow_stats.publicUS.top5[:3] %}
+                            <div class="truncate">
+                                {% if service %}
+                                    <span class="name font-semibold">{{ service }}</span>
+                                    <span class="text-gray-500 text-xs">({{ ip }}:{{ port }})</span>
+                                {% else %}
+                                    <span class="hostip">{{ ip }}</span>:<span class="port">{{ port }}</span>
+                                {% endif %}
+                                <span class="text-gray-500">({{ proto }})</span> -
+                                <span class="vendor">{{ "%.2f"|format(formatted[0]) }} {{ formatted[1] }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+
+
+                </div>
+            {% else %}
+                <p class="text-sm text-gray-500">No activity</p>
+            {% endif %}
+        </div>
+
+        <!-- Internet Download -->
+        <div class="bg-gray-800 p-4 rounded">
+            <h4 class="font-semibold mb-2 text-blue-400">🌐 Internet Download</h4>
+            {% if netflow_stats.publicDS and netflow_stats.publicDS.flow_count > 0 %}
+                <div class="text-sm space-y-1">
+                    <p><span class="text-gray-400">Total:</span>
+                       <span class="hostip">{{ "%.2f"|format(netflow_stats.publicDS.formatted_bytes[0]) }} {{ netflow_stats.publicDS.formatted_bytes[1] }}</span>
+                    </p>
+                    <p><span class="text-gray-400">Avg Speed:</span>
+                       <span class="hostip">{{ "%.2f"|format(netflow_stats.publicDS.avg_speed[0]) }} {{ netflow_stats.publicDS.avg_speed[1] }}</span>
+                    </p>
+                    <p><span class="text-gray-400">Flows:</span> {{ netflow_stats.publicDS.flow_count }}</p>
+
+
+
+                    <!-- NetFlow TOP 5 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+                    {% if netflow_stats.publicDS.top5 %}
+                    <div class="mt-2">
+                        <p class="text-gray-400 text-xs mb-1">Top 5:</p>
+                        <div class="text-xs space-y-0.5">
+                            {% for ip, port, proto, bytes, formatted, service in netflow_stats.publicDS.top5[:3] %}
+                            <div class="truncate">
+                                {% if service %}
+                                    <span class="name font-semibold">{{ service }}</span>
+                                    <span class="text-gray-500 text-xs">({{ ip }}:{{ port }})</span>
+                                {% else %}
+                                    <span class="hostip">{{ ip }}</span>:<span class="port">{{ port }}</span>
+                                {% endif %}
+                                <span class="text-gray-500">({{ proto }})</span> -
+                                <span class="vendor">{{ "%.2f"|format(formatted[0]) }} {{ formatted[1] }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+
+
+
+                </div>
+            {% else %}
+                <p class="text-sm text-gray-500">No activity</p>
+            {% endif %}
+        </div>
+
+        <!-- Intranet Upload -->
+        <div class="bg-gray-800 p-4 rounded">
+            <h4 class="font-semibold mb-2 text-purple-400">🏢 Intranet Upload</h4>
+            {% if netflow_stats.privateUS and netflow_stats.privateUS.flow_count > 0 %}
+                <div class="text-sm space-y-1">
+                    <p><span class="text-gray-400">Total:</span>
+                       <span class="hostip">{{ "%.2f"|format(netflow_stats.privateUS.formatted_bytes[0]) }} {{ netflow_stats.privateUS.formatted_bytes[1] }}</span>
+                    </p>
+                    <p><span class="text-gray-400">Avg Speed:</span>
+                       <span class="hostip">{{ "%.2f"|format(netflow_stats.privateUS.avg_speed[0]) }} {{ netflow_stats.privateUS.avg_speed[1] }}</span>
+                    </p>
+                    <p><span class="text-gray-400">Flows:</span> {{ netflow_stats.privateUS.flow_count }}</p>
+
+
+
+                    <!-- NetFlow TOP 5 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+                    {% if netflow_stats.privateUS.top5 %}
+                    <div class="mt-2">
+                        <p class="text-gray-400 text-xs mb-1">Top 5:</p>
+                        <div class="text-xs space-y-0.5">
+                            {% for ip, port, proto, bytes, formatted, service in netflow_stats.privateUS.top5[:3] %}
+                            <div class="truncate">
+                                {% if service %}
+                                    <span class="name font-semibold">{{ service }}</span>
+                                    <span class="text-gray-500 text-xs">({{ ip }}:{{ port }})</span>
+                                {% else %}
+                                    <span class="hostip">{{ ip }}</span>:<span class="port">{{ port }}</span>
+                                {% endif %}
+                                <span class="text-gray-500">({{ proto }})</span> -
+                                <span class="vendor">{{ "%.2f"|format(formatted[0]) }} {{ formatted[1] }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+
+
+
+                </div>
+            {% else %}
+                <p class="text-sm text-gray-500">No activity</p>
+            {% endif %}
+        </div>
+
+        <!-- Intranet Download -->
+        <div class="bg-gray-800 p-4 rounded">
+            <h4 class="font-semibold mb-2 text-cyan-400">🏢 Intranet Download</h4>
+            {% if netflow_stats.privateDS and netflow_stats.privateDS.flow_count > 0 %}
+                <div class="text-sm space-y-1">
+                    <p><span class="text-gray-400">Total:</span>
+                       <span class="hostip">{{ "%.2f"|format(netflow_stats.privateDS.formatted_bytes[0]) }} {{ netflow_stats.privateDS.formatted_bytes[1] }}</span>
+                    </p>
+                    <p><span class="text-gray-400">Avg Speed:</span>
+                       <span class="hostip">{{ "%.2f"|format(netflow_stats.privateDS.avg_speed[0]) }} {{ netflow_stats.privateDS.avg_speed[1] }}</span>
+                    </p>
+                    <p><span class="text-gray-400">Flows:</span> {{ netflow_stats.privateDS.flow_count }}</p>
+
+
+
+                    <!-- NetFlow TOP 5 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+                    {% if netflow_stats.privateDS.top5 %}
+                    <<div class="mt-2">
+                        <p class="text-gray-400 text-xs mb-1">Top 5:</p>
+                        <div class="text-xs space-y-0.5">
+                            {% for ip, port, proto, bytes, formatted, service in netflow_stats.privateDS.top5[:3] %}
+                            <div class="truncate">
+                                {% if service %}
+                                    <span class="name font-semibold">{{ service }}</span>
+                                    <span class="text-gray-500 text-xs">({{ ip }}:{{ port }})</span>
+                                {% else %}
+                                    <span class="hostip">{{ ip }}</span>:<span class="port">{{ port }}</span>
+                                {% endif %}
+                                <span class="text-gray-500">({{ proto }})</span> -
+                                <span class="vendor">{{ "%.2f"|format(formatted[0]) }} {{ formatted[1] }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+
+
+
+                </div>
+            {% else %}
+                <p class="text-sm text-gray-500">No activity</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- Current Status Display -->
+<div class="terminal-box p-6">
+    <h2 class="text-xl font-bold mb-4" style="color: #898989;">Network Overview</h2>
+    
+    {% if error %}
+    <div class="bg-red-600 text-white p-4 rounded">
+        <strong>Error:</strong> {{ error }}
+    </div>
+    {% elif switches %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr>
+                    <th class="whitespace-nowrap">Switch IP</th>
+                    <th class="whitespace-nowrap">Location</th>
+                    <th class="whitespace-nowrap">Status</th>
+                    <th class="whitespace-nowrap">T/A</th>
+                    <th class="whitespace-nowrap">Vendor/MAC Address</th>
+                    <th class="whitespace-nowrap">Last Seen</th>
+                    <th class="whitespace-nowrap">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sw in switches %}
+                <tr>
+                    <td class="swip whitespace-nowrap">{{ sw[0] }}</td>
+                    <td class="swip whitespace-nowrap">{{ sw[1] }}</td>
+                    <td class="swip whitespace-nowrap">{{ sw[2] }}</td>
+                    <td class="swip text-center">{{ sw[3] }}/{{ sw[4] }}</td>
+                    <td>
+                        <div class="swip whitespace-nowrap">{{sw[6][:22] if sw[6] else ''}}</div>
+                        <div class="swmac whitespace-nowrap">{{sw[5] if sw[5] != 'unknown' else ''}}</div>
+                    </td>
+                    <td class="text-sm text-gray-400 whitespace-nowrap">{{ format_timestamp(sw[7]) }}</td>
+                    <td class="text-center whitespace-nowrap">
+                        <button 
+                            onclick="quickQuery('report {{ sw[0] }}')"
+                            class="px-2 py-1 bg-purple-700 hover:bg-purple-600 rounded text-xs mr-1"
+                            title="Detailed Report"
+                        >
+                            📋
+                        </button>
+                        <button 
+                            onclick="quickQuery('map {{ sw[0] }}')"
+                            class="px-2 py-1 bg-green-700 hover:bg-green-600 rounded text-xs"
+                            title="View Map"
+                        >
+                            🗺️
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-400">No switch data available.</p>
+    {% endif %}
+</div>
+
+<script>
+function quickQuery(query) {
+    document.getElementById('queryInput').value = query;
+    document.getElementById('queryForm').submit();
+}
+</script>
+{% endblock %}
