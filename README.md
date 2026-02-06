@@ -41,7 +41,21 @@ Perfect for IT staff at small businesses, MSPs managing multiple sites, or anyon
 
 ## Screenshot Preview
 
-*(Add screenshots here once available)*
+
+![Alt text](/screenshots/01_dash1.png?raw=true "Dashboard top")
+
+![Alt text](/screenshots/02_dash2.png?raw=true "Dashboard bottom")
+
+![Alt text](/screenshots/03_report.png?raw=true "Switch Report")
+
+![Alt text](/screenshots/04_ipaddress.png?raw=true "IP Address Search")
+
+![Alt text](/screenshots/05_switchport.png?raw=true "Switchport List")
+
+![Alt text](/screenshots/06_map.png?raw=true "Switch Mapping")
+
+![Alt text](/screenshots/07_vendors.png?raw=true "MAC Address Vendor Detail")
+
 
 ## System Requirements
 
