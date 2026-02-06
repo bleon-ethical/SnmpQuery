@@ -85,7 +85,7 @@ sudo apt install -y pmacct
 
 ### 2. Clone Repository
 ```bash
-git clone https://github.com/yourusername/snmpquery.git
+git clone https://github.com/agmaiztegui/SnmpQuery.git
 cd snmpquery
 ```
 
@@ -346,7 +346,7 @@ Please open an issue or submit a pull request.
 
 ### Development Setup
 ```bash
-git clone https://github.com/yourusername/snmpquery.git
+git clone https://github.com/agmaiztegui/SnmpQuery.git
 cd snmpquery
 pip3 install -r requirements.txt
 # Make your changes
