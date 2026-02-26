@@ -19,6 +19,37 @@ Many small and medium businesses struggle with limited budgets for network monit
 
 Perfect for IT staff at small businesses, MSPs managing multiple sites, or anyone who needs visibility into their network without breaking the budget.
 
+
+## Quick Start
+
+**Want to try it quickly? Minimal setup:**
+```bash
+# 1. Install and configure
+sudo apt install -y snmp nbtscan
+git clone https://github.com/agmaiztegui/SnmpQuery.git
+cd SnmpQuery
+pip3 install -r requirements.txt
+cp snmpQuery.ini.example snmpQuery.ini
+nano snmpQuery.ini  # Add your switches and network
+
+# 2. Create ramdisk
+sudo mkdir -p /ramdisk
+sudo mount -t tmpfs -o size=512M tmpfs /ramdisk
+sudo chmod 1777 /ramdisk
+
+# 3. Start monitoring daemon
+touch snmpPyServer.running
+python3 snmpPyServer.py &
+
+# 4. Start web interface (in new terminal)
+export FLASK_SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+python3 flask_web_server.py
+```
+
+**Then open:** `http://localhost:5000`
+
+💡 **For production deployment with systemd services, see [Usage](#usage) section**
+
 ## Features
 
 ### Core Monitoring
@@ -405,8 +436,8 @@ Built to solve real-world problems in small business network management. If this
 
 ## Support & Contact
 
-- **Issues:** [GitHub Issues](https://github.com/yourusername/snmpquery/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/yourusername/snmpquery/discussions)
+- **Issues:** [GitHub Issues](https://github.com/agmaiztegui/snmpquery/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/agmaiztegui/snmpquery/discussions)
 
 ## Acknowledgments
 
