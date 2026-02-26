@@ -29,10 +29,7 @@ import time
 import os
 import sys
 import subprocess
-from subprocess import Popen, PIPE
-import array
-import threading
-import socket
+from subprocess import PIPE
 import shutil
 import fcntl
 import multiprocessing
@@ -41,9 +38,8 @@ import sqlite3
 import re
 import traceback
 import pathlib
-from funciones import *
+import funciones
 from collections import deque
-import ipaddress
 
 
 ###################################################################################################
@@ -118,8 +114,9 @@ def loguear(texto):
                 f.flush()
                 fcntl.flock(f, fcntl.LOCK_UN)
         return 0
-    except:
+    except Exception as e:
         print("There was an error attempting to read/write the syslog (!)")
+        print(e)
         return -1
     
     
@@ -131,8 +128,9 @@ def stackear(texto):
     try:
         elStack.append(escribir)
         return 0
-    except:
+    except Exception as e:
         print("An error occurred trying to add text to the debugging stack.")
+        print(e)
         return -1
 ###################################################################################################
 
@@ -158,7 +156,7 @@ if (luzVerde == 0):
 # Si sigo aca es porque puedo continuar, efectivamente, con las lecturas al archivo intermediario.
 
 # DEBUG! para usar en development
-# os.remove(archivoControl)
+os.remove(archivoControl)
 
 # ---------------------------------------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------------------------
@@ -204,7 +202,7 @@ def leerPreferencias():
                         flagSW = 0
                     if(flagSW == 0):
                         tupla = extraerVariable(cadaRenglon)
-                        if (tupla == None):
+                        if (tupla is None):
                             continue
                         if(tupla[0] == "AP"):
                             # Access Point, Line looks like this: "AP=aa:bb:cc:dd:ee:ff=APName".
@@ -226,7 +224,7 @@ def leerPreferencias():
                     else:
                         # Ok, this is a switch. "a.b.c.d=Switch-Name"
                         tupla = extraerVariable(cadaRenglon)
-                        if (tupla == None):
+                        if (tupla is None):
                             continue
                         # tupla[0] is "a.b.c.d" (the switch's IP address).
                         # tupla[1] is "Switch-Name".
@@ -327,9 +325,14 @@ def familiarizar(elSwitchPadre, elPuertoPadre, elSwitchHijo):
 # ---------------------------------------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------------------------
 
-
-def switchSewingRecursive(listaMinions, elMaster):
+# def switchSewingRecursive(listaMinions, elMaster):
+def switchSewingRecursive(listaMinions, elMaster, depth=0, max_depth=30):
     unString = "inicio switchSewingRecursive con elMaster: "+elMaster
+    
+    if(depth >= max_depth):
+        loguear("switchSewingRecursive: Max Depth reached. Exiting")
+        return -1
+    
     stackear(unString)
     localCur = diskDB.cursor()
     
@@ -360,10 +363,11 @@ def switchSewingRecursive(listaMinions, elMaster):
         # [switchIP][portNum]
         losPuertosMaster.append(rowSwitch)
     # iterating through the ports..
+    elRetorno = 0
     for unPuertoMaster in losPuertosMaster:
         ### 1. For every port (elMaster) "aQuienVes()" is called, so:
         stackear("llamo aQuienVes con (laDB, "+elMaster+", "+unPuertoMaster[1]+")")
-        switchesVisibles = aQuienVes(diskDB,elMaster,unPuertoMaster[1])
+        switchesVisibles = funciones.aQuienVes(diskDB,elMaster,unPuertoMaster[1])
         stackear("volvi de aQuienVes.")
         # aQuienVes returns data like [(ip,desc,mac),(ip,desc,mac),(ip,desc,mac),(ip,desc,mac)]
         if(len(switchesVisibles)==1):
@@ -393,7 +397,7 @@ def switchSewingRecursive(listaMinions, elMaster):
                 stackear("volvi de losConoces.")
             ### 6. If a given combination goes with losConoces():
             ### 7. "elMasterDOS" is the SON of "elMaster". Call to "familiarizar".
-            if(elMasterDOS != None):
+            if(elMasterDOS is not None):
                 stackear("llamo a familiarizar 7.")
                 familiarizar(elMaster, unPuertoMaster[1], elMasterDOS)
                 stackear("volvi de familiarizar 7.")
@@ -401,8 +405,8 @@ def switchSewingRecursive(listaMinions, elMaster):
                 ### 8. A recursive call is done, where "elMasterDOS" becomes "elMaster",
                 ###    and "losMinions" become "listaMinions". The process repeats.
                 stackear("hago llamada recursiva.")
-                switchSewingRecursive(laBolsa, elMasterDOS)
-    return 0
+                elRetorno = switchSewingRecursive(laBolsa, elMasterDOS, (depth+1), max_depth)
+    return elRetorno
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -428,7 +432,6 @@ def embolsamiento(individual, todos):
 
 def losConoces(listaMinions, elMaster):
     unString = "inicio losConoces con (elMaster, [listaMinions] ): "+elMaster+", ["
-    laBolsa = []
     for minion in listaMinions:
         unString = unString + ", " + minion[0]
     unString = unString + "]"
@@ -488,19 +491,19 @@ def switchMapper():
         """):
         switches.append(row)
     stackear("switchMapper: llamo a rootSwitchFinder.")
-    elRoot = rootSwitchFinder(diskDB)
-    stackear("switchMapper: elRoot es "+seg(elRoot[0]))
+    elRoot = funciones.rootSwitchFinder(diskDB)
+    stackear("switchMapper: elRoot es "+funciones.seg(elRoot[0]))
     # elRoot has [a.b.c.d][puntaje]
     unLog = "switchMapper: llamo a embolsamiento con elRoot y:"
     for cadaSw in switches:
-        unLog = unLog + ", " + seg(cadaSw[0])
+        unLog = unLog + ", " + funciones.seg(cadaSw[0])
     stackear(unLog)
     laBolsa = embolsamiento(elRoot[0], switches)
     # CALL:
     stackear("switchMapper: llamo a switchSewingRecursive con laBolsa y elRoot.")
     try:
         switchSewingRecursive(laBolsa, elRoot[0])
-    except Exception as e:
+    except Exception:
         loguear("Problema con llamada recursiva switchSewingRecursive")
         loguear("valores de switchMapper, (1) elRoot: "+elRoot[0])
         unString = "(2) switches: "
@@ -574,12 +577,11 @@ def fetch_arp_table(host):
     temporal = []
     for varBind in sinProcesar:
         oid = tuple(varBind[0])
-        value = varBind[1]
         if oid[:11] == (1,3,6,1,2,1,31,1,1,1,1):
             ifIndexA, ifNameA = parse_ifName(varBind)
             # from ifNameA we get the VLAN:
             laVlan = extract_vlan_from_ifname(ifNameA)
-            if(laVlan == None):
+            if(laVlan is None):
                 laVlan = "non-vlan"
             rows_to_insert1.append((ifIndexA, ifNameA, laVlan),)
         if oid[:10] == (1,3,6,1,2,1,3,1,1,2):
@@ -809,18 +811,28 @@ def netsnmpARP(host):
 # ---------------------------------------------------------------------------------------------------------------------
 
 
-def netsnmpSwitch(host):
-    dCant1 = 0
-    dCant2 = 0
-    dCant3 = 0
-    dCant4 = 0
+def netsnmpSwitch(host, strategy):
     salida = []
+    useStrategy = 0
+    if(strategy is not None):
+        useStrategy = 1
     # OIDS
     OID1 = "1.3.6.1.2.1.17.7.1.2.2.1.2"
     OID2 = "1.3.6.1.2.1.17.2.15.1.1"
     OID3 = "1.3.6.1.2.1.17.1.4.1.2"
     OID4 = "1.3.6.1.2.1.2.2.1.2"
-    OIDS = [OID1, OID2, OID3, OID4]
+    if(useStrategy==1):
+        OIDS = []
+        if(strategy[1] == "yes"):
+            OIDS.append(OID1)
+        if(strategy[2] == "yes"):
+            OIDS.append(OID2)
+        if(strategy[3] == "yes"):
+            OIDS.append(OID3)
+        if(strategy[4] == "yes"):
+            OIDS.append(OID4)
+    else:
+        OIDS = [OID1, OID2, OID3, OID4]
     """
         -On     Numeric OIDs (faster, no MIB lookup)
         -Oqv    Values only (minimal output)
@@ -900,15 +912,17 @@ def netsnmpSwitch(host):
 
 
 
+
 # ---------------------------------------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------------------------
 
 
-# Multiprocessing version using NetSNMP
-def fetch_oid_fast(host):
+
+
+def fetch_oid_fast(parametros):
+    host, strategy = parametros
     ramDB = sqlite3.connect(":memory:")   # in-RAM DB
     unCur = ramDB.cursor()
-    inicio = time.time()
 
     # TEMPORAL/AUXILIARY TABLES:
     unCur.execute("""
@@ -957,315 +971,504 @@ def fetch_oid_fast(host):
     """)
     # ----
     # OIDS
-    OID1 = "1.3.6.1.2.1.17.7.1.2.2.1.2"
-    OID2 = "1.3.6.1.2.1.17.2.15.1.1"
-    OID3 = "1.3.6.1.2.1.17.1.4.1.2"
-    OID4 = "1.3.6.1.2.1.2.2.1.2"
-    OIDS = [OID1, OID2, OID3, OID4]
-    ## --------------------------------------------
-    rows_to_insert1 = []
-    rows_to_insert2 = []
-    rows_to_insert3 = []
-    rows_to_insert4 = []
-    tprep = 0.0
-    tfetch = 0.0
-    trun = 0.0
-    tprocess = 0.0
-    tinserts = 0.0
-    intentos = 0
-    resultadoOK = 0
-    #print("---------------------------------")
-    while((intentos < 20) and (resultadoOK != 1)):
+    useStrategy = 0
+    if(funciones.validateStrategy(strategy)):
+        # the process received a none blank strategy to try.
+        useStrategy = 1
+    time1 = time.time()
+    success = 0
+    attempts = 0
+    # First, we will try to use the strategy. If it does not succeed, the
+    #   full tests will be tried.
+    debugStart = time.time()
+    while ( (success == 0) and (attempts < 2) ):
+        # OIDS to be used.
+        OID1 = "1.3.6.1.2.1.17.7.1.2.2.1.2"
+        OID2 = "1.3.6.1.2.1.17.2.15.1.1"
+        OID3 = "1.3.6.1.2.1.17.1.4.1.2"
+        OID4 = "1.3.6.1.2.1.2.2.1.2"
+        if(useStrategy==1):
+            OIDS = []
+            if(strategy[1] == "yes"):
+                OIDS.append(OID1)
+            if(strategy[2] == "yes"):
+                OIDS.append(OID2)
+            if(strategy[3] == "yes"):
+                OIDS.append(OID3)
+            if(strategy[4] == "yes"):
+                OIDS.append(OID4)
+        else:
+            OIDS = [OID1, OID2, OID3, OID4]
+        ## --------------------------------------------
+        rows_to_insert1 = []
+        rows_to_insert2 = []
+        rows_to_insert3 = []
+        rows_to_insert4 = []
+        intentosSnmp = 0
+        resultadoOK = 0
+        # We will attempt to get SNMP data and parse it into lists.
+        while((intentosSnmp < 3) and (resultadoOK != 1)):
+            try:
+                rows_to_insert1.clear()
+                rows_to_insert2.clear()
+                rows_to_insert3.clear()
+                rows_to_insert4.clear()
+                count_validos1 = 0
+                count_validos2a = 0
+                count_validos2b = 0
+                count_validos3a = 0
+                count_validos3b = 0
+                intentosSnmp = intentosSnmp + 1
+                if(useStrategy!=1):
+                    strategy = None
+                sinProcesar = netsnmpSwitch(host,strategy)
+                # If switch is ONLINE, the raw data will be on the list "sinProcesar"
+                if(sinProcesar == -1):
+                    # Switch OFFLINE!
+                    #loguear("switch "+host+" offline")
+                    return(host, 0.0, -1, None, None)
+                for varBind in sinProcesar:
+                    oid = tuple(varBind[0])
+                    # dot1qTpFdbPort
+                    if oid[:13] == (1,3,6,1,2,1,17,7,1,2,2,1,2):
+                        vlan, mac, port = parse_dot1qTpFdbPort(varBind)
+                        # Antaira switches usually have a "port 0" where it sees itself.
+                        if(port>0):
+                            rows_to_insert1.append((vlan, mac, port),)
+                        if((port > 0 and port < 999)):
+                            count_validos1 = count_validos1 + 1
+                    # dot1dStpPort
+                    if oid[:11] == (1,3,6,1,2,1,17,2,15,1,1):
+                        bridge_port, stp_port = parse_dot1dStpPort(varBind)
+                        rows_to_insert2.append((bridge_port, stp_port),)
+                        if((stp_port > 0 and stp_port < 999)):
+                            count_validos2b = count_validos2b + 1
+                        if((bridge_port > 0 and bridge_port < 999)):
+                            count_validos2a = count_validos2a + 1
+                    # dot1dBasePortIfIndex
+                    if oid[:11] == (1,3,6,1,2,1,17,1,4,1,2):
+                        bridge_port, ifindex = parse_dot1dBasePortIfIndex(varBind)
+                        rows_to_insert3.append((bridge_port, ifindex),)
+                        if((ifindex > 0 and ifindex < 999)):
+                            count_validos3b = count_validos3b + 1
+                        if((bridge_port > 0 and bridge_port < 999)):
+                            count_validos3a = count_validos3a + 1
+                    # ifDescr
+                    if oid[:10] == (1,3,6,1,2,1,2,2,1,2):
+                        ifindex, descr = parse_ifDescr(varBind)
+                        rows_to_insert4.append((ifindex, descr),)
+                # resultadoOK = 1
+                if( len(rows_to_insert1)>0 ):
+                    resultadoOK = 1
+            except Exception as e:
+                # Something failed. Retrying.
+                print(e)
+                pass
+        if(resultadoOK == 0):
+            #loguear("switch "+host+" resultadoOK == 0")
+            return(host, 0.0, -2, None, None)
+        #
+        #  
+        time2 = time.time()
+        if(useStrategy!=1):
+            # We have the 4 OIDS (possibly). We need to find all valid indexes
+            #   to be used as portNumber.
+            # Any high credibilidad ( > 90% ) can be used as port Number.
+            LportNum_table = []
+            LportNum_field = []
+            
+            if(len(rows_to_insert1)>0):
+                if( ( count_validos1/len(rows_to_insert1) ) > 0.9 ):
+                    LportNum_table.append("paso1")
+                    LportNum_field.append("pIndex1")
+            if(len(rows_to_insert2)>0):
+                if( ( count_validos2a/len(rows_to_insert2) ) > 0.9 ):
+                    LportNum_table.append("paso2")
+                    LportNum_field.append("pIndex1")
+                if( ( count_validos2b/len(rows_to_insert2) ) > 0.9 ):
+                    LportNum_table.append("paso2")
+                    LportNum_field.append("pIndex2")
+            if(len(rows_to_insert3)>0):
+                if( ( count_validos3a/len(rows_to_insert3) ) > 0.9 ):
+                    LportNum_table.append("paso3")
+                    LportNum_field.append("pIndex2")
+                if( ( count_validos3b/len(rows_to_insert3) ) > 0.9 ):
+                    LportNum_table.append("paso3")
+                    LportNum_field.append("pIndex3")
+        #
+        #
+        #
+        time3 = time.time()
+        # Inserting rows to the temp tables so we can work with SQL joins.
+        unCur.executemany(
+            "INSERT INTO paso1 (vlan, mac, pIndex1) VALUES (?, ?, ?)", rows_to_insert1
+        )
+        unCur.executemany(
+            "INSERT INTO paso2 (pIndex1, pIndex2) VALUES (?, ?)", rows_to_insert2
+        )
+        unCur.executemany(
+            "INSERT INTO paso3 (pIndex2, pIndex3) VALUES (?, ?)", rows_to_insert3
+        )
+        unCur.executemany(
+            "INSERT INTO paso4 (pIndex3, portText) VALUES (?, ?)", rows_to_insert4
+        )
+        # If we're using a strategy, we will skip ALL tests to save time. Else, ALL tests will be done.
+        if(useStrategy!=1):
+            # If paso2 does not exist, tests 1 through 6 will be FALSE.
+            # tests 1 ~ 2 check paso1+paso2     FALSE if no paso2
+            # tests 3 ~ 6 check paso2+paso3     FALSE if no paso2
+            # tests 7 ~ 8 check paso3+paso4
+            # tests 9 ~10 check paso2+paso4
+            # tests 11~12 check paso1+paso3
+            # tests 13~14 check paso1+paso4
+            test1 = False
+            test2 = False
+            test3 = False
+            test4 = False
+            test5 = False
+            test6 = False
+            test7 = False
+            test8 = False
+            test9 = False
+            test10 = False
+            test11 = False
+            test12 = False
+            test13 = False
+            condicionP1aP2 = ""
+            condicionP2aP3 = ""
+            condicionP3aP4 = ""
+            condicionP2aP4 = ""
+            condicionP1aP3 = ""
+            condicionP1aP4 = ""
+            # TEST1: Attempt to join paso1 with paso2 with paso2.pIndex2
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso2.pIndex1)
+                    FROM paso2 INNER JOIN paso1 ON paso1.pIndex1 = paso2.pIndex2
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert1)*0.75):
+                test1 = True
+                condicionP1aP2 = "paso1.pIndex1 = paso2.pIndex2"
+            # TEST2: Attempt to join paso1 with paso2 with paso2.pIndex1
+            test2 = False
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso2.pIndex1)
+                    FROM paso2 INNER JOIN paso1 ON paso1.pIndex1 = paso2.pIndex1
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert1)*0.75):
+                test2 = True
+                condicionP1aP2 = "paso1.pIndex1 = paso2.pIndex1"
+            # a. We assume paso1 and paso4 always exist. paso2 and paso3 may or may not exist.
+            # b. pasos [2, 3 and 4] have ~same~ #rows (same #N of interfaces w/ indexes,Descriptions)
+            # TESTs 3~6: Attempt to join paso2 to paso3 (4 possible combinations)
+            # TEST3:
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso3.pIndex2)
+                    FROM paso3 INNER JOIN paso2 ON paso2.pIndex1 = paso3.pIndex2
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert4)*0.75):
+                test3 = True
+                condicionP2aP3 = "paso2.pIndex1 = paso3.pIndex2"
+            # TEST4:
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso3.pIndex2)
+                    FROM paso3 INNER JOIN paso2 ON paso2.pIndex2 = paso3.pIndex2
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert4)*0.75):
+                test4 = True
+                condicionP2aP3 = "paso2.pIndex2 = paso3.pIndex2"
+            #
+            # TEST5: inverting indexes for step3
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso3.pIndex2)
+                    FROM paso3 INNER JOIN paso2 ON paso2.pIndex1 = paso3.pIndex3
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert4)*0.75):
+                test5 = True
+                condicionP2aP3 = "paso2.pIndex1 = paso3.pIndex3"
+            # TEST6:
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso3.pIndex2)
+                    FROM paso3 INNER JOIN paso2 ON paso2.pIndex2 = paso3.pIndex3
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert4)*0.75):
+                test6 = True
+                condicionP2aP3 = "paso2.pIndex2 = paso3.pIndex3"
+            # We have test3,4,5,6 telling us how to join paso2 with paso3.
+            # TESTs 7~8: We try to join paso3 and paso4.
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso4.pIndex3)
+                    FROM paso4 INNER JOIN paso3 ON paso3.pIndex2 = paso4.pIndex3
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert4)*0.75):
+                test7 = True
+                condicionP3aP4 = "paso3.pIndex2 = paso4.pIndex3"
+            #
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso4.pIndex3)
+                    FROM paso4 INNER JOIN paso3 ON paso3.pIndex3 = paso4.pIndex3
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert4)*0.75):
+                test8 = True
+                condicionP3aP4 = "paso3.pIndex3 = paso4.pIndex3"
+            # Test 9~10: paso2 and paso4
+            # TEST9: inverting indexes for step3
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso4.pIndex3)
+                    FROM paso4 INNER JOIN paso2 ON paso2.pIndex1 = paso4.pIndex3
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert4)*0.75):
+                test9 = True
+                condicionP2aP4 = "paso2.pIndex1 = paso4.pIndex3"
+            # TEST10:
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso4.pIndex3)
+                    FROM paso4 INNER JOIN paso2 ON paso2.pIndex2 = paso4.pIndex3
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert4)*0.75):
+                test10 = True
+                condicionP2aP4 = "paso2.pIndex2 = paso3.pIndex4"
+            # Test 11~12: paso1 and paso3
+            # TEST11:
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso3.pIndex3)
+                    FROM paso3 INNER JOIN paso1 ON paso1.pIndex1 = paso3.pIndex3
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert4)*0.75):
+                test11 = True
+                condicionP1aP3 = "paso1.pIndex1 = paso3.pIndex3"
+            # TEST12:
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso3.pIndex3)
+                    FROM paso3 INNER JOIN paso1 ON paso1.pIndex1 = paso3.pIndex2
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert4)*0.75):
+                test12 = True
+                condicionP1aP3 = "paso1.pIndex1 = paso3.pIndex2"
+            # Test 13: paso1 and paso4
+            # TEST13:
+            cantidad = 0
+            for row in unCur.execute("""
+                    SELECT COUNT(paso4.pIndex3)
+                    FROM paso4 INNER JOIN paso1 ON paso1.pIndex1 = paso4.pIndex3
+                """):
+                cantidad = row[0]
+            if(cantidad > len(rows_to_insert4)*0.75):
+                test13 = True
+                condicionP1aP4 = "paso1.pIndex1 = paso4.pIndex3"
+            
+            # All tests are done:
+            # "if" tests ( [1|2] and [3|4|5|6] and [7|8] ), then ALL tables connect ok.
+            # "elif" tests ( [1|2] and [9|10] ), then paso1-paso2-paso4 (paso3 is empty)
+            # "elif" tests ( [11|12] and [7|8] ), then paso1-paso3-paso4 (paso2 is empty)
+            # "elif" tests ( [13|14] ), then paso1-paso4 (paso2 and paso3 are empty)
+            # "else", we only have paso1.
+            
+            # We should have a reliable portNum ( >0 and < 999) here:
+            #    portNum_table & portNum_field
+            elSelect = None
+            
+            # Trying to do the LEAST amount of work:
+            # If paso1 or paso4 are in portNum_table, we can Attempt paso1-paso4
+            #   directly. Else we skip paso2 or paso3, else we do the full path
+            
+            # 1.
+            #
+            # FIRST: We attempt to join paso1+paso4, if portNum_table is paso1 or 4.
+                # ... if not possible:
+            # SECOND: We attempt to join paso1+paso2+paso4, if portNum_table is paso2.
+                # ... if not possible:
+            # THIRD: We attempt to join paso1+paso3+paso4, if portNum_table is paso3.
+                # ... if not possible:
+            # FOURTH: We attempt to join paso1+paso2+paso3+paso4
+            #
+            if( (test13) and (("paso1" in LportNum_table) or ("paso4" in LportNum_table)) ):
+                # paso1-paso4
+                elSelect = """
+                    SELECT paso1.vlan, paso1.mac, paso4.pIndex3, paso4.portText
+                    FROM paso1
+                        INNER JOIN paso4 ON """+condicionP1aP4+"""
+                    """
+                newStrategy = [host,"yes","no","no","yes",None,None,None,None,None,condicionP1aP4,"paso4","pIndex3"]
+            # ----------------------------------------------------------------------
+            elif( (test1 or test2) and (test9 or test10) and ("paso2" in LportNum_table) ):
+                # paso1-paso2-paso4.
+                # lets get portNum_table and porNum_field
+                position = 0
+                for item in LportNum_table:
+                    if("paso2" == item):
+                        break
+                    position = position+1
+                portNum_table = LportNum_table[position]
+                portNum_field = LportNum_field[position]
+                elSelect = f"""
+                    SELECT paso1.vlan, paso1.mac, {portNum_table}.{portNum_field}, paso4.portText
+                    FROM paso1
+                        INNER JOIN paso2 ON """+condicionP1aP2+"""
+                        INNER JOIN paso4 ON """+condicionP2aP4+"""
+                    """
+                newStrategy = [host,"yes","yes","no","yes",condicionP1aP2,None,None,condicionP2aP4,None,None,portNum_table,portNum_field]
+            # ----------------------------------------------------------------------
+            elif( (test11 or test12) and (test7 or test8) and ("paso3" in LportNum_table) ):
+                # paso1-paso3-paso4. ANTAIRA!
+                # lets get portNum_table and porNum_field
+                position = 0
+                for item in LportNum_table:
+                    if("paso3" == item):
+                        break
+                    position = position+1
+                portNum_table = LportNum_table[position]
+                portNum_field = LportNum_field[position]
+                elSelect = f"""
+                    SELECT paso1.vlan, paso1.mac, {portNum_table}.{portNum_field}, paso4.portText
+                    FROM paso1
+                        INNER JOIN paso3 ON """+condicionP1aP3+"""
+                        INNER JOIN paso4 ON """+condicionP3aP4+"""
+                    """
+                newStrategy = [host,"yes","no","yes","yes",None,None,condicionP3aP4,None,condicionP1aP3,None,portNum_table,portNum_field]
+            # ----------------------------------------------------------------------
+            elif( (test1 or test2) and (test3 or test4 or test5 or test6) and (test7 or test8) ):
+                # The 4 tables will be joined.
+                portNum_table = LportNum_table[0]
+                portNum_field = LportNum_field[0]
+                elSelect = f"""
+                    SELECT paso1.vlan, paso1.mac, {portNum_table}.{portNum_field}, paso4.portText
+                    FROM paso1
+                        INNER JOIN paso2 ON """+condicionP1aP2+"""
+                        INNER JOIN paso3 ON """+condicionP2aP3+"""
+                        INNER JOIN paso4 ON """+condicionP3aP4+"""
+                    """
+                newStrategy = [host,"yes","yes","yes","yes",condicionP1aP2,condicionP2aP3,condicionP3aP4,None,None,None,portNum_table,portNum_field]
+            # ----------------------------------------------------------------------
+            # We went the full route, but now we know the shortest path for the next runs: newStrategy has the data.
+        time4 = time.time()
+        if(useStrategy==1):
+            # We know a strategy we can use.
+            portNum_table = strategy[11]
+            portNum_field = strategy[12]
+            usePaso2 = strategy[2]
+            usePaso3 = strategy[3]
+            condicionP1aP2 = strategy[5]
+            condicionP2aP3 = strategy[6]
+            condicionP3aP4 = strategy[7]
+            condicionP2aP4 = strategy[8]
+            condicionP1aP3 = strategy[9]
+            condicionP1aP4 = strategy[10]
+            #
+            if(not funciones.validateStrategy(strategy)):
+                loguear("Host "+host+". La estrategia no es valida. Deshabilitandola y reintentando.")
+                useStrategy = 0
+                continue
+            #
+            if( usePaso2 == "yes" and usePaso3 == "yes" ):
+                # the 4 tables will do.
+                joinConditions = " INNER JOIN paso2 ON "+condicionP1aP2+" "
+                joinConditions = joinConditions + "INNER JOIN paso3 ON "+condicionP2aP3+" "
+                joinConditions = joinConditions + "INNER JOIN paso4 ON "+condicionP3aP4+" "
+            if( usePaso2 == "no" and usePaso3 == "yes" ):
+                # paso1+paso3+paso4
+                joinConditions = " INNER JOIN paso3 ON "+condicionP1aP3+" "
+                joinConditions = joinConditions + "INNER JOIN paso4 ON "+condicionP3aP4+" "
+            if( usePaso2 == "yes" and usePaso3 == "no" ):
+                # paso1+paso2+paso4
+                joinConditions = " INNER JOIN paso2 ON "+condicionP1aP2+" "
+                joinConditions = joinConditions + "INNER JOIN paso4 ON "+condicionP2aP4+" "
+            if( usePaso2 == "no" and usePaso3 == "no" ):
+                # paso1+paso3+paso4
+                joinConditions = " INNER JOIN paso4 ON "+condicionP1aP4+" "
+            #########################################################################################
+            elSelect = f"""
+                SELECT paso1.vlan, paso1.mac, {portNum_table}.{portNum_field}, paso4.portText
+                FROM paso1"""+joinConditions
+        time5 = time.time()
+        # either if we used a strategy or not, we should have some sort of SELECT defined.
+        if(elSelect is None):
+            return(host, 0.0, -2, None, None)
+        elMerge = []
         try:
-            rows_to_insert1.clear()
-            rows_to_insert2.clear()
-            rows_to_insert3.clear()
-            rows_to_insert4.clear()
-            count_validos1 = 0
-            count_validos2 = 0
-            count_validos3 = 0
-            intentos = intentos + 1
-            tiempoAux1 = time.time()
-            sinProcesar = netsnmpSwitch(host)
-            tiempoAux2 = time.time()
-            tfetch = tfetch + (tiempoAux2-tiempoAux1)
-            tiempoAux1 = tiempoAux2
-            # If switch is ONLINE, the raw data will be on the list "sinProcesar"
-            if(sinProcesar == -1):
-                # Switch OFFLINE!
-                final = time.time()
-                tiempo = final - inicio
-                return(host, tiempo, -1)
-            for varBind in sinProcesar:
-                oid = tuple(varBind[0])
-                # dot1qTpFdbPort
-                found = 0
-                if oid[:13] == (1,3,6,1,2,1,17,7,1,2,2,1,2):
-                    found = 1
-                    vlan, mac, port = parse_dot1qTpFdbPort(varBind)
-                    rows_to_insert1.append((vlan, mac, port),)
-                    if((port > 0 and port < 999)):
-                        count_validos1 = count_validos1 + 1
-                # dot1dStpPort
-                if oid[:11] == (1,3,6,1,2,1,17,2,15,1,1):
-                    found = 1
-                    bridge_port, stp_port = parse_dot1dStpPort(varBind)
-                    rows_to_insert2.append((bridge_port, stp_port),)
-                    if((stp_port > 0 and stp_port < 999)):
-                        count_validos2 = count_validos2 + 1
-                # dot1dBasePortIfIndex
-                if oid[:11] == (1,3,6,1,2,1,17,1,4,1,2):
-                    found = 1
-                    bridge_port, ifindex = parse_dot1dBasePortIfIndex(varBind)
-                    rows_to_insert3.append((bridge_port, ifindex),)
-                    if((ifindex > 0 and ifindex < 999)):
-                        count_validos3 = count_validos3 + 1
-                # ifDescr
-                if oid[:10] == (1,3,6,1,2,1,2,2,1,2):
-                    found = 1
-                    ifindex, descr = parse_ifDescr(varBind)
-                    rows_to_insert4.append((ifindex, descr),)
-            # resultadoOK = 1
-            if( len(rows_to_insert1)>0 ):
-                resultadoOK = 1
+            for row in unCur.execute(elSelect):
+                elMerge.append( (row[0], row[1].replace(':','-'), row[2], row[3] ) )
         except Exception as e:
-            # Something failed. Retrying.
-            print(e)
-            pass
-    if(resultadoOK == 0):
-        final = time.time()
-        tiempo = final - inicio
-        return(host, tiempo, -2) 
-    tiempoAux2 = time.time()
-    tprocess = tprocess + (tiempoAux2-tiempoAux1)
-    tiempoAux1 = tiempoAux2
-    credibilidad1 = count_validos1 / len(rows_to_insert1)
-    if(len(rows_to_insert2) == 0):
-        credibilidad2 = 0
-    else:
-        credibilidad2 = count_validos2 / len(rows_to_insert2)
-    if(len(rows_to_insert3) == 0):
-        credibilidad3 = 0
-    else:
-        credibilidad3 = count_validos3 / len(rows_to_insert3)
+            loguear(str(e))
+            loguear(traceback.format_exc())
+            loguear("")
+            loguear("SELECT:")
+            loguear(elSelect)
+            # Strategy did not work.
+            useStrategy = 0
+            loguear(LportNum_table)
+            loguear(LportNum_field)
+        time6 = time.time()
+            
+        ################################################################### did it work?
+        # [VLAN][MAC][pIndex?][portText]
+        ### If the result is OK, we should return the strategy back along with the results.
+        validos = 0
+        # elMerge has many rows, each row has [vlan, mac, portNumber, PortDesc]
+        for cosa in elMerge:
+            if( int(cosa[2]) < 999 ):
+                validos = validos + 1
+        #
+        # so, do we have a significant amount of rows and valid portNumers? 
+        if( (len(elMerge) > (len(rows_to_insert1)*0.75) ) and (validos > (len(rows_to_insert1)*0.75) ) ):
+            # success!
+            success = 1
+            if(useStrategy!=1):
+                strategy = newStrategy
+        else:
+            # In case we had attempted a strategy, we will disable it to run
+            #   all tests in the next attempt.
+            useStrategy = 0
+        #    
+        time7 = time.time()
+        losTiempos = None
+        if( success == 1 ):
+            strTiempos = "\n\n   TIEMPOS SWITCH "+host+"\n"
+            strTiempos += f"      validateStrategy: {time1 - debugStart:.3f}\n"
+            strTiempos += f"      snmp call & rows: {time2 - time1:.3f}\n"
+            strTiempos += f"      portNum selected: {time3 - time2:.3f}\n"
+            strTiempos += f"      13 TESTs + query: {time4 - time3:.3f}\n"
+            strTiempos += f"      strategy + query: {time5 - time4:.3f}\n"
+            strTiempos += f"      > executequery(): {time6 - time5:.3f}\n"
+            strTiempos += f"      verif. resultado: {time7 - time6:.3f}\n"
+            return host, 0.0, elMerge, losTiempos, strategy
+            # Returned data looks like this:
+            # [switchIP][time][ dataTable ][moreTimes][strategy]
+            # [a.b.c.d][1.23455][ [vlan][mac][unPort][portDesc] ][ losTiempos ][ [][][][][][][][][][][][] ]
+        else:
+            attempts = attempts + 1
+    # We run out of attempts.
+    return(host, 0.0, -2, None, None)
     
-    """
-        # We need to select the best PORT id/description
-        Depending on the switch firmware, the tables are built slightly
-        different and many combinations are possible.
-        The objective is to interconnect the tables to connect the
-        port IDs, port number or name, and it's description.
-        Different switches make and models, have different formats for the port#.
-        We need to standarize them so it becomes harmonic and easy to read later on.
-  
-        There are 4 queries to OIDs. On some switches, with the 1º and 4º we're done,
-        others will be needing 1º, 3º or 4º, or the four at the same time.
-        - From table 1, we get the % of port numbers that are below 999.
-          WHY: port "25" sounds OK, port "1003" might be a ethernet channel / port aggregation.
-          If some ports are above 999 but most are below, then the number seems useful.
-          If most of the numbers are above 999, most probable case is that the number in question
-          is an internal interface ID, not relatable to the numerical designation for the port.
-          - So if > 95% complies, we try to relate this table to table 4 to get a description.
-          - If not possible to relate to it, we use table 3 as a bridge for internal IDs.
-        - If < 95%, we check table 2. It might NOT exist! Depends ond brand and model.
-          - if it actually exists (has actual data), we check if table 3 also exists and
-            perform the join.
-          - if it does not exist, we check if table 3 does and if we can join them.
-        
-        - ONE MORE THING: besides knowing how to join the tables, we also need which portIndex
-          to use. If portIndex looks like "62542" and portText "gigabit ethernet 1/2/3: copper"
-          we need the latter. But we also need a "3" as portIndex.
-          If credibilidad1 is good, we use the index from the second table. Else,
-            we use the index from the 3rd table.
-    """
-    # Inserting rows to the temp tables so we can work with SQL joins.
-    unCur.executemany(
-        "INSERT INTO paso1 (vlan, mac, pIndex1) VALUES (?, ?, ?)", rows_to_insert1
-    )
-    unCur.executemany(
-        "INSERT INTO paso2 (pIndex1, pIndex2) VALUES (?, ?)", rows_to_insert2
-    )
-    unCur.executemany(
-        "INSERT INTO paso3 (pIndex2, pIndex3) VALUES (?, ?)", rows_to_insert3
-    )
-    unCur.executemany(
-        "INSERT INTO paso4 (pIndex3, portText) VALUES (?, ?)", rows_to_insert4
-    )
-    tiempoAux2 = time.time()
-    tinserts = tinserts + (tiempoAux2-tiempoAux1)
-    tiempoAux1 = tiempoAux2
-    # - PASO3 is useless.
-    # - PASO1 y PASO4 sometimes suffice on their own.
-    # - PASO1 y PASO2 sometimes uses index1, sometimes index2.
-    test1 = False
-    condicionP1aP2 = ""
-    datoP2 =""
-    for row in unCur.execute("""
-            SELECT COUNT(paso1.mac)
-            FROM paso1 LEFT JOIN paso2 ON paso1.pIndex1 = paso2.pIndex2
-        """):
-        cantidad = row[0]
-    if(cantidad > len(rows_to_insert1)*0.75):
-        test1 = True
-        condicionP1aP2 = "paso1.pIndex1 = paso2.pIndex2"
-        datoP2 = "paso2.pIndex1"
-    test2 = False
-    for row in unCur.execute("""
-            SELECT COUNT(paso1.mac)
-            FROM paso1 LEFT JOIN paso2 ON paso1.pIndex1 = paso2.pIndex1
-        """):
-        cantidad = row[0]
-    if(cantidad > len(rows_to_insert1)*0.75):
-        test2 = True
-        condicionP1aP2 = "paso1.pIndex1 = paso2.pIndex1"
-        datoP2 = "paso2.pIndex2"
-    test3 = False
-    test4 = False
-    test5 = False
-    test6 = False
-    condicionP2aP3 = ""
-    datoP3 = ""
-    if(test1 or test2):
-        # checking how to tie with step 3.
-        for row in unCur.execute("""
-                SELECT COUNT(paso2.pIndex1)
-                FROM paso2 LEFT JOIN paso3 ON paso2.pIndex1 = paso3.pIndex2
-            """):
-            cantidad = row[0]
-        if(cantidad > len(rows_to_insert2)*0.75):
-            test3 = True
-            condicionP2aP3 = "paso2.pIndex1 = paso3.pIndex2"
-            datoP3 = "paso3.pIndex3"
-        #
-        for row in unCur.execute("""
-                SELECT COUNT(paso2.pIndex1)
-                FROM paso2 LEFT JOIN paso3 ON paso2.pIndex2 = paso3.pIndex2
-            """):
-            cantidad = row[0]
-        if(cantidad > len(rows_to_insert2)*0.75):
-            test4 = True
-            condicionP2aP3 = "paso2.pIndex2 = paso3.pIndex2"
-            datoP3 = "paso3.pIndex3"
-        #
-        # inverting indexes for step3
-        for row in unCur.execute("""
-                SELECT COUNT(paso2.pIndex1)
-                FROM paso2 LEFT JOIN paso3 ON paso2.pIndex1 = paso3.pIndex3
-            """):
-            cantidad = row[0]
-        if(cantidad > len(rows_to_insert2)*0.75):
-            test5 = True
-            condicionP2aP3 = "paso2.pIndex1 = paso3.pIndex3"
-            datoP3 = "paso3.pIndex2"
-        #
-        for row in unCur.execute("""
-                SELECT COUNT(paso2.pIndex1)
-                FROM paso2 LEFT JOIN paso3 ON paso2.pIndex2 = paso3.pIndex3
-            """):
-            cantidad = row[0]
-        if(cantidad > len(rows_to_insert2)*0.75):
-            test6 = True
-            condicionP2aP3 = "paso2.pIndex2 = paso3.pIndex3"
-            datoP3 = "paso3.pIndex2"
-    # We have test3,4,5,6 telling us how to join paso2 with paso3.
-    # We do the same thing with paso3 and paso4.
-    test7 = False
-    test8 = False
-    condicionP3aP4 = ""
-    if(test3 or test4 or test5 or test6):
-        for row in unCur.execute("""
-                SELECT COUNT(paso4.pIndex3)
-                FROM paso3 LEFT JOIN paso4 ON paso3.pIndex2 = paso4.pIndex3
-            """):
-            cantidad = row[0]
-        if(cantidad > len(rows_to_insert3)*0.75):
-            test7 = True
-            condicionP3aP4 = "paso3.pIndex2 = paso4.pIndex3"
-        #
-        for row in unCur.execute("""
-                SELECT COUNT(paso4.pIndex3)
-                FROM paso3 LEFT JOIN paso4 ON paso3.pIndex3 = paso4.pIndex3
-            """):
-            cantidad = row[0]
-        if(cantidad > len(rows_to_insert3)*0.75):
-            test8 = True
-            condicionP3aP4 = "paso3.pIndex3 = paso4.pIndex3"
-    ###
-    ###
-    ### NOT BEING DONE: paso1 with paso3. Might be needed in the future. But 
-    ### it doesn't look like it.
-    ###
-    ###
-    
-    # Finally, if test1 and test2 are False, there is no tabla2. We join paso1 with paso4.
-    # Test1 & 2 may both be False, or one of them be True. Need to pick an useful index.
-    
-    # # # # # # # 
-     # # # # # # #
-    # # # # # # # 
-    elSelect = None
-    # MERGE.
-    if( len(rows_to_insert2) > 2 ):
-        # paso2 has data. We join. Two possibilities:
-        if(test1):
-            datos = datoP2+", "+datoP3
-            elSelect = """
-                SELECT paso1.vlan, paso1.mac, paso1.pIndex1, """+datos+""", paso4.portText
-                FROM paso1
-                    LEFT JOIN paso2 ON """+condicionP1aP2+"""
-                    LEFT JOIN paso3 ON """+condicionP2aP3+"""
-                    LEFT JOIN paso4 ON """+condicionP3aP4+"""
-                """
-    if( len(rows_to_insert2) < 2 ):
-        # paso2 is Empty. Ignoring.
-        elSelect = """
-            SELECT paso1.vlan, paso1.mac, paso1.pIndex1, 'nada', 'nada', paso4.portText
-            FROM paso1
-                LEFT JOIN paso4 ON paso1.pIndex1 = paso4.pIndex3
-            """
-    if(elSelect == None):
-        return(host, 0.0, -2)
-    elMerge = []
-    for row in unCur.execute(elSelect):
-        elMerge.append( (row[0], row[1].replace(':','-'), row[2], row[3], row[4], row[5]), )
-    # HERE, we've got a table for sure:
-    # [VLAN][MAC][pIndexA][pIndexB][pIndexC][portText]
-    # some port indexes may be empty/null.
-    # puede que algunos port index esten vacíos.
 
-    # We check tuple position.
-    if(credibilidad1 > 0.95):
-        # We will keep:
-        # [VLAN][MAC][pIndexA][portText]
-        posicion = 2
-    if( (credibilidad1 < 0.95) and (credibilidad2 > 0.75) ):
-        # We will keep:
-        # [VLAN][MAC][pIndexB][portText]
-        posicion = 3
-    if( (credibilidad1 < 0.95) and (credibilidad2 < 0.75) ):
-        # We will keep:
-        # [VLAN][MAC][pIndexC][portText]
-        posicion = 4
-    # [vlan][mac][port][port2][port3][portDesc]
-    resultados = []
-    for row in elMerge:
-        resultados.append((row[0],row[1],row[posicion],row[5]),)
-    # [vlan][mac][unPort][portDesc]
-    final = time.time()
-    tiempo = final - inicio
-    if(tprep < 0.001):
-        tprep = 0.001
-    if(tfetch < 0.001):
-        tfetch = 0.001
-    if(tprocess < 0.001):
-        tprocess = 0.001
-    if(tinserts < 0.001):
-        tinserts = 0.001
-    losTiempos = [(tprep),(tfetch),(tprocess),(tinserts)]
-    return host, tiempo, resultados, losTiempos
-    # Returned data looks like this:
-    # [a.b.c.d][1.23455][ [vlan][mac][unPort][portDesc] ][ losTiempos ]
 
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -1305,8 +1508,8 @@ def hostnameUpdateWorker(stop_event):
 
     while not stop_event.is_set():
         try:
-            laRedLocal = leerDBenSQL(diskDBworker, "NETWORK")
-            maskbits = leerDBenSQL(diskDBworker, "MASKBITS")
+            laRedLocal = funciones.leerDBenSQL(diskDBworker, "NETWORK")
+            maskbits = funciones.leerDBenSQL(diskDBworker, "MASKBITS")
             losHosts = []
             comando = "nbtscan -t 500 -l -q "+laRedLocal+"/"+maskbits
             proceso2 = subprocess.Popen(comando, shell=True, close_fds=True, stdout=PIPE)
@@ -1332,7 +1535,7 @@ def hostnameUpdateWorker(stop_event):
                 diskDBworker.rollback()
                 print(e)
             time.sleep(2)
-        except Exception as e:
+        except Exception:
             pass
 
 
@@ -1351,6 +1554,27 @@ def testearRequerimientos():
 
 def crearTablas():
     localCur = diskDB.cursor()
+    
+    # switch strategy for better performance:
+    localCur.execute("""
+        CREATE TABLE IF NOT EXISTS snmpStrategy (
+            switchIP TEXT,
+            usePaso1 TEXT,
+            usePaso2 TEXT,
+            usePaso3 TEXT,
+            usePaso4 TEXT,
+            condicionP1aP2 TEXT,
+            condicionP2aP3 TEXT,
+            condicionP3aP4 TEXT,
+            condicionP2aP4 TEXT,
+            condicionP1aP3 TEXT,
+            condicionP1aP4 TEXT,
+            portNum_table TEXT,
+            portNum_field TEXT
+        )
+    """)
+    
+    
     # performance tracking:
     localCur.execute("""
         CREATE TABLE IF NOT EXISTS statistics (
@@ -1544,7 +1768,7 @@ def crearTablasHistoricas(histDB):
 
 def ARPrefresh():
     localCur = diskDB.cursor()
-    elRouter = getGateway(diskDB)
+    elRouter = funciones.getGateway(diskDB)
     elStamp = time.time()
     auxTabla = fetch_arp_table(elRouter)
     laTabla = []
@@ -1566,7 +1790,7 @@ def ARPrefresh():
                 """
             )
             diskDB.commit()
-        except Exception as e:
+        except Exception:
             diskDB.rollback()
 
 
@@ -1577,7 +1801,6 @@ def ARPrefresh():
 
 
 def updateSwitchStatus(result):
-    localCur = diskDB.cursor()
     unStamp = time.time()
     switchOffline = 0
     if(result[2] == -1):
@@ -1594,7 +1817,7 @@ def updateSwitchStatus(result):
                 WHERE switchIP = ?
             """, ("ONLINE ("+str(len(result[2]))+" MACs)", unStamp, result[0]) )
             diskDB.commit()
-        except Exception as e:
+        except Exception:
             diskDB.rollback()
 
 
@@ -1620,7 +1843,7 @@ def procesarMacAddresses(result):
                     )
     """)
     unStamp = time.time()
-    if( isOnline(diskDB, result[0]) and ( result[2] != -1 ) and ( result[2] != -2 ) ):
+    if( funciones.isOnline(diskDB, result[0]) and ( result[2] != -1 ) and ( result[2] != -2 ) ):
         # preparo las MACs.
         macInserts = []
         switchPortInserts = []
@@ -1665,7 +1888,7 @@ def procesarMacAddresses(result):
             # We discover ACCESS/TRUNK/ROOT ports while inside the SQL transaction.
             portTypeUpdater()
             diskDB.commit()
-        except Exception as e:
+        except Exception:
             diskDB.rollback()
             print("hice rollback")
 
@@ -1678,10 +1901,10 @@ def procesarMacAddresses(result):
 
 def portTypeUpdater():
     localCur = diskDB.cursor()
-    laGatewayMAC = getGatewayMAC(diskDB)
+    laGatewayMAC = funciones.getGatewayMAC(diskDB)
     elBypassString = None
-    elBypassString = leerDBenSQL(diskDB,"bypass")
-    if(elBypassString != None):
+    elBypassString = funciones.leerDBenSQL(diskDB,"bypass")
+    if(elBypassString is not None):
         switchBypass,portBypass = extraerVariable(elBypassString)
     localCur.execute("""
         UPDATE switchport SET isRoot =
@@ -1869,10 +2092,10 @@ if __name__ == "__main__":
     crearTablas()
     if(global_offline == 0):
         leerPreferencias()
-    global_community = leerDBenSQL(diskDB, "community")
+    global_community = funciones.leerDBenSQL(diskDB, "community")
     # updating the VENDORS table
     if( not os.path.exists("/ramdisk/index.html") ):
-        updateVendors(diskDB)
+        funciones.updateVendors(diskDB)
     # Starting an endless hostname updater process, completely independant.
     stop_event = multiprocessing.Event()
     process_hostnames = multiprocessing.Process(target=hostnameUpdateWorker, args=(stop_event,),)
@@ -1888,26 +2111,33 @@ if __name__ == "__main__":
         runtime_secs = elTTL*3600
     else:
         runtime_secs = 3600
+    
     while( ((time.time() - startingTime) < runtime_secs ) and (haltFlag == 0) ):
         # MAIN LOOP
         inicio = time.time()
         # We read the preferences file to get settings, switches, APs, etc.
         if(global_offline == 0):
             leerPreferencias()
-        HOSTS = getSwitchesAll(diskDB)
+        # HOSTS = getSwitchesAll(diskDB)
+        HOSTS = funciones.get_SWITCHES_with_STRATS(diskDB)
         # We fetch the ARP Table from the router and update the switches' MAC addresses.
         if(global_offline == 0):
             ARPrefresh()
         if(len(HOSTS)==0):
             print("No hay switches en el sistema, verifique snmpQuery.ini")
             sys.exit(0)
+        #
         # MULTIPROCESSING POOL for SNMP walks.
         if(global_offline == 0):    
             with Pool(processes=concurrentes) as pool:
                 for result in pool.imap_unordered(fetch_oid_fast, HOSTS):
+                    # result = [switchIP][time][ dataTable ][moreTimes][strategy]
                     # Update switches ONLINE/OFFLINE status.
                     updateSwitchStatus(result)
                     procesarMacAddresses(result)
+                    if(result[4] is not None):
+                        funciones.setStrategy(diskDB, result[4])
+                    #
         # Now that we've got MACs and Ports for all switches, we can update switchPort
         # with ACCESS/TRUNK [ROOT] data.
         try:
@@ -1922,7 +2152,7 @@ if __name__ == "__main__":
         persitirHistoricos(diskDB)
         #
         fin = time.time()
-        global_stats_switches = countSwitchesOnline(diskDB)
+        global_stats_switches = funciones.countSwitchesOnline(diskDB)
         tiempoCiclo = (fin-inicio)
         if(global_stats_switches>0):
             global_stats_perf = tiempoCiclo / global_stats_switches
@@ -1938,7 +2168,7 @@ if __name__ == "__main__":
             WHERE CAST(stamp AS REAL) < ?
         """, (floatStampCorte,))
         #
-        # PERFORMANEC AUTO-TUNNER! How many concurrent threads should we go for?
+        # PERFORMANCE AUTO-TUNNER: How many concurrent threads should we go for?
         #
         if(tiempoAnterior != 0):
             # if != 0, we've got a full cycle data.
@@ -1985,7 +2215,7 @@ if __name__ == "__main__":
             haltFlag = 1
             loguear("snmpPyServer was DISABLED. ")
             loguear("File ["+archivoOperacion+"] no longer present. exiting... ")
-
+        # loguear(estadisticas)
     
 ###################################################################################################
 ### 4. CLEAN EXIT ###
@@ -1996,7 +2226,7 @@ process_hostnames.join()
 time.sleep(0.5)
 try:
     os.remove(archivoControl)
-except:
+except Exception:
     pass
 print("END.")
 loguear("END.")

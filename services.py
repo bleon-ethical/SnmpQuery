@@ -9,8 +9,6 @@ This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published
 by the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
-
-services.py - List of known networks to better describe netflow data
 """
 
 import ipaddress
@@ -122,11 +120,11 @@ SERVICE_DB = {
     "2.16.0.0/13": "Akamai CDN",
     
     # ========== FASTLY CDN ==========
-    "151.101.0.0/16": "Fastly CDN",
+    "151.101.0.0/16": "Fastly CDN - Reddit",
     "157.52.64.0/18": "Fastly CDN",
     "167.82.0.0/17": "Fastly CDN",
     "185.31.16.0/22": "Fastly CDN",
-    "199.232.0.0/16": "Fastly CDN",
+    "199.232.0.0/16": "Fastly CDN - Reddit",
     
     # ========== NETFLIX ==========
     "23.246.0.0/18": "Netflix",
@@ -306,10 +304,6 @@ SERVICE_DB = {
     "161.117.0.0/16": "TikTok",
     "203.107.0.0/16": "TikTok",
     
-    # ========== REDDIT ==========
-    "151.101.0.0/16": "Reddit",
-    "199.232.0.0/16": "Reddit",
-    
     # ========== GITHUB ==========
     "140.82.112.0/20": "GitHub",
     "143.55.64.0/20": "GitHub",
@@ -336,7 +330,6 @@ SERVICE_DB = {
     "50.23.0.0/16": "IBM Cloud",
     "108.168.128.0/17": "IBM Cloud",
     "169.38.0.0/16": "IBM Cloud",
-    "169.45.0.0/16": "IBM Cloud",
     "169.46.0.0/15": "IBM Cloud",
     "169.48.0.0/14": "IBM Cloud",
     "169.53.0.0/16": "IBM Cloud",
@@ -438,11 +431,11 @@ def get_service_name(ip):
                     network = ipaddress.ip_network(cidr, strict=False)
                     if ip_obj in network:
                         return service
-                except:
+                except Exception:
                     continue
         
         return None
-    except:
+    except Exception:
         return None
 
 def format_ip_with_service(ip):
@@ -541,7 +534,7 @@ if __name__ == "__main__":
     
     print("\n" + "=" * 50)
     stats = get_database_stats()
-    print(f"Database Statistics:")
+    print("Database Statistics:")
     print(f"  Total entries: {stats['total_entries']}")
     print(f"  Exact IPs:     {stats['exact_ips']}")
     print(f"  CIDR ranges:   {stats['cidr_ranges']}")

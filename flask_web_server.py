@@ -37,21 +37,16 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
-flask_web_server.py - handles the web interface that allows queries and displays information.
 """
 
 
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required
 import sqlite3
-import json
-import time
 from datetime import datetime
-from functools import wraps
 import pathlib
-from funciones import *
+import funciones
 
 # ============================================================================
 # CONFIGURATION
@@ -165,13 +160,13 @@ def interpretarDireccion(cmd):
             pass
     
     # 2. Is it a full MAC?
-    posibleMac = sanitizeMAC(cmd)
-    mac_address_std = standarizeFullMAC(posibleMac)
+    posibleMac = funciones.sanitizeMac(cmd)
+    mac_address_std = funciones.standarizeFullMAC(posibleMac)
     if mac_address_std:
         return ("mac", (mac_address_std,))
     
     # 3. Is it a partial MAC?
-    if validarMacParcial(posibleMac):
+    if funciones.validarMacParcial(posibleMac):
         return ("mac", (posibleMac,))
     
     return (None, None)
@@ -199,7 +194,7 @@ def format_timestamp(timestamp_str):
             return f"{hours} hour{'s' if hours != 1 else ''} ago"
         else:
             return dt.strftime("%Y-%m-%d %H:%M")
-    except:
+    except Exception:
         return timestamp_str
 
 def get_query_history():
@@ -242,9 +237,9 @@ def logout():
 @app.route('/', methods=['GET', 'POST'])
 @login_required
 def dashboard():
-    """Main dashboard - shows status() by default"""
+    """Main dashboard - shows funciones.status() by default"""
     try:
-        switches = status()
+        switches = funciones.status()
         
         if request.method == 'POST':
             print(request.form.get('netflow_window_dash'))
@@ -253,8 +248,8 @@ def dashboard():
         
         
         netflow_minutes = float(request.form.get('netflow_window_dash', 5))
-        netflow_stats = netflow_global_stats(minutes=netflow_minutes)
-        # netflow_stats = netflow_global_stats(minutes=5)
+        netflow_stats = funciones.netflow_global_stats(minutes=netflow_minutes)
+        # netflow_stats = funciones.netflow_global_stats(minutes=5)
         return render_template('dashboard.html', 
                              switches=switches,
                              netflow_stats=netflow_stats,
@@ -292,12 +287,12 @@ def query():
         
         # For now, create a mapping (replace this after importing)
         COMMAND_MAP = {
-            'status': status,
-            'switchport': switchport,
-            'map': mapSwitch,
-            'report': report,
-            'ip': ipSearch,
-            'mac': lambda mac: macSearch(mac) if standarizeFullMAC(mac) else macSearchPart(mac)
+            'status': funciones.status,
+            'switchport': funciones.switchport,
+            'map': funciones.mapSwitch,
+            'report': funciones.report,
+            'ip': funciones.ipSearch,
+            'mac': lambda mac: funciones.macSearch(mac) if funciones.standarizeFullMAC(mac) else funciones.macSearchPart(mac)
         }
         
         # Execute the command
@@ -319,22 +314,22 @@ def query():
             devices = sorted( devices, key=lambda d: (d[1], int(d[2])) )
             result = (devices, aps)
             #
-            if(devices != None):
+            if(devices is not None):
                 if len(devices) == 1:
                     show_netflow = True
                     host_ip = devices[0][5]  # IP address is at index 5
                     netflow_minutes = float(request.form.get('netflow_window', 5))
-                    netflow_data = netflow_host_stats(host_ip, minutes=netflow_minutes)
+                    netflow_data = funciones.netflow_host_stats(host_ip, minutes=netflow_minutes)
         
         elif cmd_name == "switchport":
             # Show NetFlow if only one device on port
             switch_info, devices = result
-            if(devices != None):
+            if(devices is not None):
                 if len(devices) == 1:
                     show_netflow = True
                     host_ip = devices[0][3]  # IP at index 3 in switchport result
                     netflow_minutes = float(request.form.get('netflow_window', 5))
-                    netflow_data = netflow_host_stats(host_ip, minutes=netflow_minutes)
+                    netflow_data = funciones.netflow_host_stats(host_ip, minutes=netflow_minutes)
         
         
         # Add to history

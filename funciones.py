@@ -16,22 +16,17 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-funciones.py - main logic and auxiliary functions
 """
 
 # MAIN and Auxiliary Functions.
 import subprocess
-from subprocess import Popen, PIPE
+from subprocess import PIPE
 import re
-from datetime import datetime
 import time
 import os
-import sys
-import array
 import sqlite3
-import traceback
 from html import escape
-from services import get_service_name, format_ip_with_service
+from services import get_service_name
 
 
 
@@ -47,12 +42,12 @@ vendors_regex = re.compile(r'^([0-9A-Fa-f\-]+)\s*\(hex\)\s*(.+)$')
 def seg(elemento):
     # Safe value-to-string conversion.
     # elemento gets back as string, OR [ ERROR-SEG: es None ]" / "[ ERROR-SEG: value ]"
-    if(elemento == None):
+    if(elemento is None):
         return "[ ERR-SEG: None ]"
     try:
         devolver = str(elemento)
         return devolver
-    except:
+    except Exception:
         return "[ ERR-SEG: value ]"
 
 
@@ -187,6 +182,129 @@ def isOnline(laDB, unSwitch):
     
     
     
+  
+# ---------------------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+  
+  
+    
+
+def getStrategy(laDB, elSwitch):
+    localCur = laDB.cursor()
+    devolver = None
+    for row in localCur.execute("""
+        SELECT *
+        FROM snmpStrategy
+        WHERE switchIP LIKE ?
+    """,(elSwitch,)):
+        devolver = row
+    return devolver
+
+
+def setStrategy(laDB, theStrategy):
+    localCur = laDB.cursor()
+    localCur.execute("BEGIN IMMEDIATE")
+    localCur.execute("DELETE FROM snmpStrategy WHERE switchIP LIKE ?",(theStrategy[0],))
+    try:
+        localCur.executemany("""INSERT INTO snmpStrategy
+            (
+            switchIP,
+            usePaso1,
+            usePaso2,
+            usePaso3,
+            usePaso4,
+            condicionP1aP2,
+            condicionP2aP3,
+            condicionP3aP4,
+            condicionP2aP4,
+            condicionP1aP3,
+            condicionP1aP4,
+            portNum_table,
+            portNum_field
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", [theStrategy])
+        laDB.commit()
+    except Exception:
+        laDB.rollback()
+        print("----------------------------------")
+        print(theStrategy)
+        print(type(theStrategy))
+        print(len(theStrategy))
+        print("----------------------------------")
+    
+'''
+CREATE TABLE IF NOT EXISTS snmpStrategy (
+   0 switchIP TEXT,
+    usePaso1 TEXT,
+    usePaso2 TEXT,
+    usePaso3 TEXT,
+    usePaso4 TEXT,
+    
+   5 condicionP1aP2 TEXT,
+    condicionP2aP3 TEXT,
+    condicionP3aP4 TEXT,
+    condicionP2aP4 TEXT,
+    condicionP1aP3 TEXT,
+    condicionP1aP4 TEXT,
+    portNum_table TEXT,
+    portNum_field TEXT
+)
+
+
+
+if( usePaso2 == "yes" and usePaso3 == "yes" ):
+    # the 4 tables will do.
+    joinConditions = " INNER JOIN paso2 ON "+condicionP1aP2+" "
+    joinConditions = joinConditions + "INNER JOIN paso3 ON "+condicionP2aP3+" "
+    joinConditions = joinConditions + "INNER JOIN paso4 ON "+condicionP3aP4+" "
+if( usePaso2 == "no" and usePaso3 == "yes" ):
+    # paso1+paso2+paso4
+    joinConditions = " INNER JOIN paso2 ON "+condicionP1aP2+" "
+    joinConditions = joinConditions + "INNER JOIN paso4 ON "+condicionP2aP4+" "
+if( usePaso2 == "yes" and usePaso3 == "no" ):
+    # paso1+paso3+paso4
+    joinConditions = " INNER JOIN paso3 ON "+condicionP1aP3+" "
+    joinConditions = joinConditions + "INNER JOIN paso4 ON "+condicionP3aP4+" "
+'''
+
+
+
+def validateStrategy(strategy):
+    if(strategy is None):
+        return False
+    if(strategy[0] is None):
+        return False
+    if(strategy[11] is None):
+        return False
+    if(len(strategy[11]) == 0):
+        return False
+    if(strategy[12] is None):
+        return False
+    if(len(strategy[12]) == 0):
+            return False
+    if( strategy[2] and strategy[3] ):
+        # all 4.
+        if( strategy[5] is None ):
+            return False
+        if( strategy[6] is None ):
+            return False
+        if( strategy[7] is None ):
+            return False
+    if( not strategy[2] and strategy[3] ):
+        # paso1-paso2-paso4
+        if( strategy[8] is None ):
+            return False
+    if( strategy[2] and not strategy[3] ):
+        # paso1-paso3-paso4
+        if( strategy[9] is None ):
+            return False
+    if( not strategy[2] and not strategy[3] ):
+        # paso1-paso4
+        if( strategy[10] is None ):
+            return False
+    return True
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------------------------
   
@@ -201,6 +319,19 @@ def getSwitchesAll(laDB):
         HOSTS.append(row[0])
     return HOSTS
     
+
+
+def get_SWITCHES_with_STRATS(laDB):
+    # We deliver a list of [HOST,[host's Strategy]]
+    
+    losHosts = getSwitchesAll(laDB)
+    devolver = []
+    for cadaH in losHosts:
+        laStrat = getStrategy(laDB, cadaH)
+        devolver.append((cadaH,laStrat))
+    return devolver
+
+
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -281,7 +412,7 @@ def isSwitch(laDB, unaIP):
 
 
 def sanitizeMAC(algoMac):
-    if(algoMac != None):
+    if(algoMac is not None):
         algoMac = algoMac.lower()
         algoMac = algoMac.replace(":","-")
         return algoMac
@@ -374,11 +505,11 @@ def updateVendors(laDB):
     try:
         os.remove("/ramdisk/index.html")
         print("index.html (vendors) deleted.")
-    except Exception as e:
+    except Exception:
         print("index.html not deleted.")
         pass
     proceso2 = subprocess.Popen(comando, shell=True, close_fds=True, stdout=PIPE)
-    resultado = proceso2.communicate()[0]
+    proceso2.communicate()[0]
     with open("/ramdisk/index.html","r") as volatil:
         bodoque = volatil.readlines()
         lineasHex = []
@@ -540,7 +671,7 @@ def report(elSwitch):
         SELECT switchStatus FROM switch WHERE switchIP = ?
         """, (elSwitch,)):
         estado = row[0]
-    if( estado == None ):
+    if( estado is None ):
         print("switch inexistente")
         return (None,None)
     if( estado == "OFFLINE" ):
@@ -595,7 +726,7 @@ def report(elSwitch):
     for unRow in losPuertos:
         # We iterate row by row to update the hostname field. WORK IN PROGRESS. AVAYA module not ready.
         telefono = extensionCheck(unRow[4], diskDB)
-        if(telefono != None):
+        if(telefono is not None):
             campoHOSTNAME = telefono
         else:
             campoHOSTNAME = unRow[6]
@@ -618,7 +749,7 @@ def status(elSwitchIP=None):
     # We want: A list of switches with IP, Description, Ports with MACs, Trunks,
     # No# of MACs / OFFLINE, and vendor.
     swData = []
-    if(elSwitchIP != None):
+    if(elSwitchIP is not None):
         opcional = "WHERE switch.switchIP = '"+elSwitchIP+"'"
     else:
         opcional = "ORDER BY switch.switchIP"
@@ -680,7 +811,6 @@ def macSwitch(unaMac, unSwitch):
         rowExists.append(row)
     if( len(rowExists) == 0 ):
         return None,None,"No se reconoce el switch."
-    elSwitchYdesc = []
     for unRow in rowExists:
         if( unRow[1] == "OFFLINE" ):
             return None,None,"El switch "+unRow[0]+" está OFFLINE."
@@ -757,18 +887,18 @@ def macSearchPart(unaParte):
                 WHERE portType = "ACCESS"
             )
         """, (f"%{unaParte}%",)):
-        if(row[6] == None):
+        if(row[6] is None):
             campoVENDOR = "N/A"
         else:
             campoVENDOR = row[6]
         
-        if(row[7] == None):
+        if(row[7] is None):
             campoHOSTNAME = "N/A"
         else:
             campoHOSTNAME = row[7]
         # AVAYA en el row[5] está la IP. Mando a ver si no es un teléfono interno!
         telefono = extensionCheck(row[2], diskDB)
-        if(telefono != None):
+        if(telefono is not None):
             campoHOSTNAME = telefono
         auxRow = row[:6] + (campoVENDOR,) + (campoHOSTNAME,) + row[8:]
         devolver.append(auxRow)
@@ -802,7 +932,7 @@ def macSearch(unaMac):
 
     # The MAC could be Whole or partial. We only know it has valid characters.
     # standarizeFullMac returns None if not a Whole MAC.
-    if( standarizeFullMAC(unaMac) != None ):
+    if( standarizeFullMAC(unaMac) is not None ):
         elWHERE = "WHERE macaddress.unaMac = ?"
     else:
         unaMac = "%"+unaMac+"%"
@@ -829,17 +959,17 @@ def macSearch(unaMac):
     elSwitch = None
     elPuerto = None
     for row in diskCur.execute(elQuery, (unaMac,)):
-        if(row[6] == None):
+        if(row[6] is None):
             campoVENDOR = "N/A"
         else:
             campoVENDOR = row[6]
-        if(row[7] == None):
+        if(row[7] is None):
             campoHOSTNAME = "N/A"
         else:
             campoHOSTNAME = row[7]
         # AVAYA en el row[5] está la IP. Mando a ver si no es un teléfono interno!
         telefono = extensionCheck(row[2], diskDB)
-        if(telefono != None):
+        if(telefono is not None):
             campoHOSTNAME = telefono
         auxRow = row[:6] + (campoVENDOR,) + (campoHOSTNAME,) + row[8:]
         devolver.append(auxRow)
@@ -875,7 +1005,7 @@ def mapSwitch(elSwitch):
     elRoot = rootSwitchFinder(diskDB)
     #
     # Is is ONLINE?
-    if( isOnline(diskDB, elSwitch) == False ):
+    if( not isOnline(diskDB, elSwitch) ):
         print("switch OFFLINE o inexistente")
         return None
     arbolito = []
@@ -967,17 +1097,17 @@ def ipSearch(unaIP):
                 WHERE portType = "ACCESS"
             )
         """, (unaIP,)):
-        if(row[6] == None):
+        if(row[6] is None):
             campoVENDOR = "N/A"
         else:
             campoVENDOR = row[6]
-        if(row[7] == None):
+        if(row[7] is None):
             campoHOSTNAME = "N/A"
         else:
             campoHOSTNAME = row[7]
         # AVAYA en el row[5] está la IP. Mando a ver si no es un teléfono interno!
         telefono = extensionCheck(row[2], diskDB)
-        if(telefono != None):
+        if(telefono is not None):
             campoHOSTNAME = telefono
         auxRow = row[:6] + (campoVENDOR,) + (campoHOSTNAME,) + row[8:]
         devolver.append(auxRow)
@@ -1042,15 +1172,15 @@ def switchport(elSwitch, elPuerto):
             AND macaddress.unPuerto = ?
         """, (elSwitch, elPuerto)):
         # May or may not have IP addresss (ARP & LEFT JOIN!)
-        if(row[3] == None):
+        if(row[3] is None):
             campoIP = "N/A"
         else:
             campoIP = row[3]
-        if(row[4] == None):
+        if(row[4] is None):
             campoVENDOR = "N/A"
         else:
             campoVENDOR = row[4]
-        if(row[5] == None):
+        if(row[5] is None):
             campoHOSTNAME = "N/A"
         else:
             campoHOSTNAME = row[5]
@@ -1268,7 +1398,7 @@ def netflow_global_stats(minutes=5):
         result['publicDS'] = query_table('netflowPublicDS', False)
         result['privateUS'] = query_table('netflowPrivateUS', True)
         result['privateDS'] = query_table('netflowPrivateDS', False)
-    except sqlite3.OperationalError as e:
+    except sqlite3.OperationalError:
         # Tables might not exist yet
         pass
     finally:
@@ -1471,7 +1601,7 @@ def extensionCheck(unaIP, unaDB):
             if(len(valor)>0):
                 return valor
         return None
-    except:
+    except Exception:
         return None
         
     

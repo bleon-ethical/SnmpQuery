@@ -19,28 +19,20 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-netflowProcessor-py - parses raw flows table and keeps 4 public/private, up/down stream ones.
 """
 
 
-from datetime import datetime
 import time
-import os
-import sys
-import subprocess
-from subprocess import Popen, PIPE
 import multiprocessing
-from multiprocessing import Pool
 import sqlite3
 import traceback
-import warnings
-warnings.filterwarnings("ignore", category=SyntaxWarning)
-from funciones import *
+import funciones
 import ipaddress
 import signal
 import logging
 import threading
-
+import warnings
+warnings.filterwarnings("ignore", category=SyntaxWarning)
 
 # ---------------------------------------------------------------------------------------------------------------------
 stop_event = threading.Event()
@@ -66,7 +58,6 @@ def netflowUpdater(stop_event):
     diskDB = sqlite3.connect("/ramdisk/snmpqserver.db", isolation_level=None)
     diskDB.execute("PRAGMA journal_mode=WAL;")
     diskDB.execute("PRAGMA synchronous=NORMAL;")
-    diskCur = diskDB.cursor()
     # Processed info Database (non-Root)
     netflowDB = sqlite3.connect("/ramdisk/netflow.db", isolation_level=None)
     netflowDB.execute("PRAGMA journal_mode = DELETE;")
@@ -87,8 +78,8 @@ def netflowUpdater(stop_event):
             ahora = time.time()
             if( (ahora - lastNetflow) > netflowRefresh ):
                 # 1. We get network address and maskbits from the siteData table:
-                laNetworkAddr = leerDBenSQL(diskDB,"NETWORK")
-                losMaskBits = leerDBenSQL(diskDB,"MASKBITS")
+                laNetworkAddr = funciones.leerDBenSQL(diskDB,"NETWORK")
+                losMaskBits = funciones.leerDBenSQL(diskDB,"MASKBITS")
                 rawRows = []
                 curatedPublicDS = []
                 curatedPublicUS = []
@@ -115,7 +106,7 @@ def netflowUpdater(stop_event):
                     ORDER BY CAST(stamp AS REAL) DESC
                     """):
                     unStamp3 = row[0]
-                if(masReciente == None):
+                if(masReciente is None):
                     masReciente = 0.0
                 for row in netflowCur.execute("""
                     SELECT MAX(CAST(stamp AS REAL))
@@ -124,16 +115,16 @@ def netflowUpdater(stop_event):
                     """):
                     unStamp4 = row[0]
                     
-                if(unStamp1 != None):
+                if(unStamp1 is not None):
                     if(unStamp1 > masReciente):
                         masReciente = unStamp1
-                if(unStamp2 != None):
+                if(unStamp2 is not None):
                     if(unStamp2 > masReciente):
                         masReciente = unStamp2
-                if(unStamp3 != None):
+                if(unStamp3 is not None):
                     if(unStamp3 > masReciente):
                         masReciente = unStamp3
-                if(unStamp4 != None):
+                if(unStamp4 is not None):
                     if(unStamp4 > masReciente):
                         masReciente = unStamp4
                 # We only bring flows that we don't have already.
