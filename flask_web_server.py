@@ -47,6 +47,9 @@ import sqlite3
 from datetime import datetime
 import pathlib
 import funciones
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 # ============================================================================
 # CONFIGURATION
@@ -387,7 +390,12 @@ def api_query():
             'result': result
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logging.error(f"Error in {func.__name__}: {str(e)}", exc_info=True)
+        
+        return jsonify({
+            'success': False,
+            'error': 'An internal error occurred while processing the request.'
+        }), 500
 
 # ============================================================================
 # MAIN
@@ -396,4 +404,4 @@ def api_query():
 if __name__ == '__main__':
     # Run on all interfaces so it's accessible on LAN
     # Use debug=False in production!
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
