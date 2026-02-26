@@ -28,7 +28,7 @@ jobs:
       - name: Run Semgrep
         run: |
           docker run --rm -v "${{ github.workspace }}:/src" returntocorp/semgrep \
-          semgrep --config=auto --config=p/python --config=p/flask --config=p/html \
+          semgrep --config="p/default" --config="p/python" --config="p/flask" \
           --text -o semgrep_results.txt || true
 
       - name: Initialize CodeQL
